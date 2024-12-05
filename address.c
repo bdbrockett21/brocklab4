@@ -1,13 +1,8 @@
-#ifndef LAB4_H
-#define LAB4_H
 
 #include <stdio.h>
 #include <stdlib.h>
-
-#define NUM_PAGES 256
-#define TLB_LEN 16
-#define FRAME_ADDR_BITS 8
-#define OFFSET_ADDR_BITS 8
+#include <math.h>
+#include "lab4.h"
 
 
 Page_Entry* page_table;
@@ -16,7 +11,6 @@ Main_Memory main_mem;
 FILE* backing_store_fp;
 
 
-// Corrected function with proper name
 int get_page_from(int logical_address, int page_size) {
     if (page_size <= 0) {
         fprintf(stderr, "Page size must be greater than 0.\n");
@@ -174,42 +168,25 @@ void init_backing_store(char*filename){
         }
     }
 }
-int roll_in(unsigned char page, unsigned char frame) {
-    if (backing_store_file == NULL) {
-        fprintf(stderr, "Backing store not initialized\n");
-        return -1;
-    }
-
-    long page_offset = page * (1 << OFFSET_ADDR_BITS);
-    
-    if (fseek(backing_store_file, page_offset, SEEK_SET) != 0) {
+int roll_in(char*filename) {
+    if(fseek(backing_store_file,page*(1 << OFFSET_ADDR_BITS),SEEK_SET)! = 0) {
         perror("Error seeking in backing store");
-        return -1;
+        return -1
     }
-
-    char* dest = main_mem.mem + (frame * (1 << OFFSET_ADDR_BITS));
-    
-    size_t bytes_read = fread(dest, 1, 1 << OFFSET_ADDR_BITS, backing_store_file);
-    
-    if (bytes_read != (1 << OFFSET_ADDR_BITS)) {
-        perror("Error reading from backing store");
-        return -1;
-    }
-
-    return 0;
 }
-if (fread(main_mem.mem + (frame * (1 << OFFSET_ADDR_BITS)), 
-          1,                               // Size of each element
-          (1 << OFFSET_ADDR_BITS),         // Number of elements
-          backing_store) != (1 << OFFSET_ADDR_BITS)) {
-    // Check if end of file or actual read error
-    if (feof(backing_store)) {
+if (fread(
+    main_mem.mem + (frame * (1 << OFFSET_ADDR_BITS)), 
+    1,                                                 
+    1 << OFFSET_ADDR_BITS,                            
+    backing_store_file                                 
+) != (1 << OFFSET_ADDR_BITS)) {
+    // Check if end of file or read error
+    if (feof(backing_store_file)) {
         fprintf(stderr, "Unexpected end of file\n");
     } else {
         perror("Error reading from backing store");
     }
     return -1;
-
 }
 // Implement the Physical Memory functions below this line
 extern Main_Memory main_mem;
