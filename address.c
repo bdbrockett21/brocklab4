@@ -1,7 +1,13 @@
+#ifndef LAB4_H
+#define LAB4_H
 
+#include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
-#include "lab4.h"
+
+#define NUM_PAGES 256
+#define TLB_LEN 16
+#define FRAME_ADDR_BITS 8
+#define OFFSET_ADDR_BITS 8
 
 
 Page_Entry* page_table;
@@ -11,14 +17,13 @@ FILE* backing_store_fp;
 
 
 // Corrected function with proper name
-int get_page_from(int page_number, int page_size) {
-    if(page_number < 1 || page_size < 1) {
-        printf("Page number and page size must be greater than 0.\n");
-        return (page_number - 1) * page_size;
+int get_page_from(int logical_address, int page_size) {
+    if (page_size <= 0) {
+        fprintf(stderr, "Page size must be greater than 0.\n");
+        return -1;
     }
-    
+    return logical_address / page_size;
 }
-
 // Define PageTableEntry structure (if not already in lab4.h)
 typedef struct {
     int frame_number;
@@ -87,27 +92,32 @@ int main() {
 
 // Implement the TLB functions below this line
 void init_tlb() {
-    tlb.entry = malloc(sizeof(TLB_Entry)*TLB_LEN);
-    tlb.length =  TLB_LEN;
+    tlb.entry = malloc(sizeof(TLB_Entry) * TLB_LEN);
+    if (tlb.entry == NULL) {
+        fprintf(stderr, "Failed to allocate TLB memory\n");
+        exit(1);
+    }
+    tlb.length = TLB_LEN;
     tlb.head = 0;
     tlb.tail = 0;
     tlb.is_full = 0;
-}
-//initialize all entries as invalid
-    for(int i = 0; i < tlb.length; i++) {
+
+    // Initialize all entries as invalid
+    for (int i = 0; i < tlb.length; i++) {
         tlb.entry[i].is_valid = 0;
     }
+}
 
-short tlb_lookup() {
-    for(int i = 0; i < tlb.length; i++) {
-        if(tlb.entry[i].is_valid && tlb.entry[i].page == page) {
+short tlb_lookup(unsigned char page) {
+    for (int i = 0; i < tlb.length; i++) {
+        if (tlb.entry[i].is_valid && tlb.entry[i].page == page) {
+            // Assuming increment_tlb_hit() is defined elsewhere
             increment_tlb_hit();
             return tlb.entry[i].frame;
         }
     }
     return -1;
 }
-
 void update_tlb(unsinged char page, unsigned char frame ) {
     // if TLB is ful we use the character buffer replacement 
     if(tlb.is_full) {
@@ -139,9 +149,13 @@ void close_tlb() {
 }
 
 // physical memory functions 
-void init_physical_memory(){
-    main_mem.mem = malloc((1 <<(FRAME_ADDR_BITS + OFFSET_ADDR_BITS)));
-    main.mem.next_available_frame = 0;
+void init_physical_memory() {
+    main_mem.mem = malloc(1 << (FRAME_ADDR_BITS + OFFSET_ADDR_BITS));
+    if (main_mem.mem == NULL) {
+        fprintf(stderr, "Failed to allocate physical memory\n");
+        exit(1);
+    }
+    main_mem.next_available_frame = 0;
 }
 
 void free_physical_memory(){
@@ -160,15 +174,42 @@ void init_backing_store(char*filename){
         }
     }
 }
-int roll_in(char*filename) {
-    if(fseek(backing_store_file,page*(1 << OFFSET_ADDR_BITS),SEEK_SET)! = 0) {
-        perror("Error seeking in backing store");
-        return -1
+int roll_in(unsigned char page, unsigned char frame) {
+    if (backing_store_file == NULL) {
+        fprintf(stderr, "Backing store not initialized\n");
+        return -1;
     }
+
+    long page_offset = page * (1 << OFFSET_ADDR_BITS);
+    
+    if (fseek(backing_store_file, page_offset, SEEK_SET) != 0) {
+        perror("Error seeking in backing store");
+        return -1;
+    }
+
+    char* dest = main_mem.mem + (frame * (1 << OFFSET_ADDR_BITS));
+    
+    size_t bytes_read = fread(dest, 1, 1 << OFFSET_ADDR_BITS, backing_store_file);
+    
+    if (bytes_read != (1 << OFFSET_ADDR_BITS)) {
+        perror("Error reading from backing store");
+        return -1;
+    }
+
+    return 0;
 }
-if(fread(main_mem.mem + (frame*(1 << OFFSET_ADDR_BITS)),1(1 << OFFSET_ADDR_BITS)){
-    perror("Error reading from backing store");
+if (fread(main_mem.mem + (frame * (1 << OFFSET_ADDR_BITS)), 
+          1,                               // Size of each element
+          (1 << OFFSET_ADDR_BITS),         // Number of elements
+          backing_store) != (1 << OFFSET_ADDR_BITS)) {
+    // Check if end of file or actual read error
+    if (feof(backing_store)) {
+        fprintf(stderr, "Unexpected end of file\n");
+    } else {
+        perror("Error reading from backing store");
+    }
     return -1;
+
 }
 // Implement the Physical Memory functions below this line
 extern Main_Memory main_mem;
